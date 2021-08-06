@@ -1,6 +1,12 @@
 # OpenSwiftUIX
 Open Source Implementation of SwiftUI for Apple iOS
 
+
+This project has just started and is under heavy development. Very early stage.
+
+
+
+
 This project uses source code from the following projects:
 
 
