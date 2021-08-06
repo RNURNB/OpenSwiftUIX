@@ -1,0 +1,4 @@
+module CoreRender {
+    header "IosCoreRender.h"
+    export *
+}
