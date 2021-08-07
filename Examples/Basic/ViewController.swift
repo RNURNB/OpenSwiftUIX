@@ -9,17 +9,17 @@ struct DemoState {
  
 class GlobalState:ObservableObject {
     @Published var state:String="Global State" 
-}
+} 
   
 struct Item:Hashable, Identifiable {  
-    var name:String
-    let id=UUID()  
-              
-    init(_ name:String) {         
-        self.name=name 
+    var name:String 
+    let id=UUID()   
+               
+    init(_ name:String) {          
+        self.name=name   
     }        
-}   
-     
+}    
+      
 struct ListSection:Hashable, Identifiable { 
     var name:String 
     let id=UUID()
@@ -62,6 +62,60 @@ enum ShapeType {
     case rectangle
     case squircle
 }
+
+
+var demo=DemoClass()
+
+func testSplitView(listSelection:Binding<Item?>,navigator:ZStackNavigator) -> some View {
+            SplitView(primary: {
+                List(selection:listSelection) {
+                    ForEach(demo.sections/*, id: \.self*/) { section in
+                        //Text(section.name)
+                        Section(header: Text("\(section.name)")
+                                        .text(color:.red).height(60), footer:Text("footer \(section.name)").text(color:.black).height(40)) {
+                            //Text(section.name)
+                            ForEach(section.items, id: \.self) { item in
+                                //NavigationLink(destination: ItemDetail(item: item)) {
+                                
+                              //PassthroughView {
+                                HStack/*(alignment:.bottom)*/ {
+                                    //ItemRow(item: item)
+                                    Spacer().width(20)
+                                    Text(item.name) //.height(60)
+                                    Spacer(minLength:10) 
+                                    Text(">")
+                                    Spacer().width(2)
+                                }
+                                //.justifyContent(.center)
+                                .height(70)
+                                .alignItems(.center)
+                
+                                //.tag(item.id) 
+                              //}.height(80)
+                            } //ForEach
+                        } //section
+                        //.header(height:40)
+                    }
+                } //List
+                //.width(400)
+                //.matchParentWidth(withMargin: 0)
+                //.matchParentHeight(withMargin: 0)
+            } //NavigationView
+            ,secondary: {
+                ZStackView(navigator:navigator,def:{Text("default zstack content")}) /*{
+                    VStack {
+                        TextField("edit me") //.margin(top:-50)
+                        Text("abcdef") //.margin(top:-50)
+                    }
+                    
+                    Text("page 2")
+                }*/
+            })
+            .matchParentWidth(withMargin: 0)
+            //.flexGrow(1)
+            //.minHeight(100)
+            //.matchParentHeight(withMargin: 0)
+}
  
 class TMainForm: SCLFormController {
   //var hostingView: SCLUIHostingView<Demo1View.Body>?=nil
@@ -72,10 +126,10 @@ class TMainForm: SCLFormController {
   public final class Demo1View:View {
     public var context:SCLContext?=nil
     //public func withLayoutSpec(_ spec:@escaping (_ spec:LayoutSpec<UIView/*Self.UIBody*/>) -> Void) -> Self {return self}  
+    var zstackcount=0
       
     @State var buildcount:Int=0 
     @Binding var text:String
-    @StateObject var demo=DemoClass()
     @StateObject var demo1:Contact
     @SceneStorage var edit:String=""
     @State var listSelection:Item?
@@ -94,6 +148,8 @@ class TMainForm: SCLFormController {
         
         print("Mainform initialized")
     }
+    
+    let zstackNavigator=ZStackNavigator()
       
     public var body: some View {
         VStack(/*alignment:.center,*//*spacing:4*/) {
@@ -110,7 +166,7 @@ class TMainForm: SCLFormController {
                     //.renderingMode(.original)
                 }
                 
-                Spacer().width(5)
+                /*Spacer().width(5)
                 
                 Button(action: {
                     //loadPreset=true
@@ -119,9 +175,9 @@ class TMainForm: SCLFormController {
                 }) {
                     Image(systemName: "trash")
                     //.renderingMode(.original)
-                }
+                }*/
                 
-                Spacer().width(5)
+                /*Spacer().width(5)
                 Button(action: {
                     //loadPreset=true
                     print("Application state is : ",self.state.state)
@@ -131,7 +187,7 @@ class TMainForm: SCLFormController {
                 }) {
                     Text(LocalizedStringKey("\(state.state)"))
                     .foregroundColor(.link)
-                }
+                }*/
                 
                 Spacer().width(5)
                 Button(action: {
@@ -142,6 +198,41 @@ class TMainForm: SCLFormController {
 
                 }) {
                     Text("Locale \(locale) env:\(envlocale)")
+                    .foregroundColor(.link)
+                }
+                
+                Spacer().width(5)
+                Button(action: {
+                    //loadPreset=true
+                    var color:UIColor = .black
+                    
+                    self.zstackcount=self.zstackNavigator.count
+                    if self.zstackcount==0 {color = .blue}
+                    if self.zstackcount==1 {color = .yellow}
+                    if self.zstackcount==2 {color = .red}
+                    
+                    self.zstackNavigator.push {
+                        VStack {
+                            TextField("edit me") //.margin(top:-50)
+                            Text("abcdef") //.margin(top:-50)
+                            Spacer(minLength:10) 
+                        }
+                        .backgroundColor(color)
+                        .matchParentWidth(withMargin: 0)
+                    }
+
+                }) {
+                    Text("push ZStack")
+                    .foregroundColor(.link)
+                }
+                
+                Spacer().width(5)
+                Button(action: {
+                    //loadPreset=true
+                    self.zstackNavigator.pop()
+
+                }) {
+                    Text("pop ZStack")
                     .foregroundColor(.link)
                 }
                 
@@ -186,17 +277,17 @@ class TMainForm: SCLFormController {
                 //self.demo.testlist.append("xyz")
                 //self.demo.testlist.removeAll()
                 Application!.debugMsgs=""
-                self.demo.testlist.append("abc \(self.demo.age)")
-                var section=ListSection("abc \(self.demo.age)")
-                section.items.append(Item("abc \(self.demo.age) 1"))
-                section.items.append(Item("abc \(self.demo.age) 2"))
-                if self.demo.sections.count > 10 {
-                    self.demo.sections.insert(section,at:1)
+                demo.testlist.append("abc \(demo.age)")
+                var section=ListSection("abc \(demo.age)")
+                section.items.append(Item("abc \(demo.age) 1"))
+                section.items.append(Item("abc \(demo.age) 2"))
+                if demo.sections.count > 10 {
+                    demo.sections.insert(section,at:1)
                 }
                 else {
-                    self.demo.sections.append(section)
+                    demo.sections.append(section)
                 }
-                self.demo.age=self.demo.age+1
+                demo.age=demo.age+1
                 //alert("testlist","\(self.demo.testlist)")
                 
                 self.demo1.haveBirthday()
@@ -213,25 +304,6 @@ class TMainForm: SCLFormController {
                     Text("Whoa!")
             }
             
-            /*SwitchOver(shapeType)
-                .case(.capsule) {
-                    //Capsule().frame(width: 50, height: 100)
-                    Text("Capsule ?!")
-                }
-                .case(.circle) {
-                    //Circle().frame(width: 50, height: 50)
-                    Text("Circle ?!")
-                    Text("ok!")
-                }
-                .case(.rectangle) {
-                    //Rectangle().frame(width: 50, height: 50)
-                    Text("Rectangle ⬛!")
-                }
-                .default {
-                    Text("Whoa!")
-                }
-            */
-            
             TextView(isDebugHost:true)
             .height(350)
             .matchHostingViewWidth(withMargin: 0)
@@ -239,82 +311,10 @@ class TMainForm: SCLFormController {
             .foregroundColor(.white)
             .font(Font.system(size: 10, weight: .regular, design: .monospaced))
             
-            /*
-            HStack(spacing:2) { 
-                Text("label xyz") 
-                .background(color:.black)
-                Text(" and label 123") 
-                Text(" middle")
-                
-                //PassthroughView {
-                //VStack { 
-                  List(selection:$listSelection) {
-                    ForEach(self.demo.sections/*, id: \.self*/) { section in
-                        //Text(section.name)
-                        Section(header: Text("\(section.name)")
-                                        .text(color:.red).height(60), footer:Text("footer \(section.name)").text(color:.black).height(40)) {
-                            //Text(section.name)
-                            ForEach(section.items, id: \.self) { item in
-                                //NavigationLink(destination: ItemDetail(item: item)) {
-                                
-                              //PassthroughView {
-                                HStack/*(alignment:.bottom)*/ {
-                                    //ItemRow(item: item)
-                                    Spacer(width:20)
-                                    Text(item.name) //.height(60)
-                                    Spacer(minLength:10)
-                                    Text(">")
-                                }
-                                //.justifyContent(.center)
-                                .height(70)
-                                .alignItems(.center)
-                
-                                //.tag(item.id) 
-                              //}.height(80)
-                            } //ForEach
-                        } //section
-                        //.header(height:40)
-                    }
-                  } //List
-                  .width(700)
-                  .height(400)
-                  //.flexGrow(1) 
-                  .background(color:.systemGray2)
-                /*}
-                .matchParentHeight(withMargin: 0)
-                .flex()
-                .flexGrow(1)
-                .background(color:.systemGray3)*/
-                /*}
-                .width(700)
-                .matchParentHeight(withMargin: 0)*/
-                
-                Spacer(minLength:10)
-                Text("App builds: \(Application!.buildCount)").text(color:.red)
-            }
-            .background(color:.lightGray)
-            .alignItems(.center)
-            //.justifyContent(.center)
-            //.matchHostingViewHeight(withMargin: 0)
-            //.matchHostingViewWidth(withMargin: 0)
-            //.matchParentWidth(withMargin: 0)
-            //.matchParentHeight(withMargin: 0)
-            */
             
-            
-            //NavigationView {
-                
-                /*ZStackView {
-                    VStack {
-                        TextField("edit me") //.margin(top:-50)
-                        Text("abcdef") //.margin(top:-50)
-                    }
-                }*/
-                
-            
-            SplitView(primary: {
+            NavigationView {
                 List(selection:$listSelection) {
-                    ForEach(self.demo.sections/*, id: \.self*/) { section in
+                    ForEach(demo.sections/*, id: \.self*/) { section in
                         //Text(section.name)
                         Section(header: Text("\(section.name)")
                                         .text(color:.red).height(60), footer:Text("footer \(section.name)").text(color:.black).height(40)) {
@@ -342,26 +342,10 @@ class TMainForm: SCLFormController {
                         //.header(height:40)
                     }
                 } //List
-                //.width(400)
-                //.matchParentWidth(withMargin: 0)
-                //.matchParentHeight(withMargin: 0)
-            } //NavigationView
-            ,secondary: {
-                ZStackView {
-                    VStack {
-                        TextField("edit me") //.margin(top:-50)
-                        Text("abcdef") //.margin(top:-50)
-                    }
-                }
-            })
-            .matchParentWidth(withMargin: 0)
-            //.flexGrow(1)
-            //.minHeight(100)
-            //.matchParentHeight(withMargin: 0)
+            }
+                
+            //testSplitView(listSelection:$listSelection,navigator:zstackNavigator)
             
-            
-            
-             
             /*Button("click me 2") {
                 self.buildcount=self.buildcount+1
             }*/

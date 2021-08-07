@@ -372,21 +372,149 @@ public struct _ZStackViewLayout {
     public typealias Body = Never
 }
 
+public class ZStackNavigator {
+    internal var node:SCLNavigationViewController?=nil 
+    internal var context:SCLContext?=nil
+    internal var children:[ViewNode]=[]
+    public var count:Int {get {children.count}}
+    public var current:Int {
+        get {children.count-1}
+        set(newvalue) {
+            if newvalue<0 {clear()}
+            else {
+                while children.count-1 > newvalue {pop(animations:false)}
+            }
+        }
+    }
+    
+    public init() {}
+    
+    public func update(context:SCLContext) {
+        self.context=context
+        for c in children {c.value!.setContext(context)}
+    }
+    
+    public func push<Content>(@ViewBuilder _ content: () -> Content) where Content: View {
+        let viewcontent=content()
+        
+        //create a dummy node for content
+        let content=ViewNode(value: ConcreteNode(type:UIView.self, layoutSpec:{spec, context in 
+            //fatalError()
+            print("zstackview content layoutspec")
+            spec.view?.clipsToBounds=true
+            //if minLength>0 {yoga.width=minLength}
+        }))
+        content.value!.setContext(context!) //this will also specify environment
+    
+        ViewExtractor.extractViews(contents: viewcontent).forEach { 
+                //print("build list node ",$0)
+                if let n=$0.buildTree(parent: content, in:content.runtimeenvironment) 
+                {
+                    //elements.append(n)
+                    //print("got list view node ",n)
+                }
+            }
+        
+        children.append(content)
+        
+        addContent(content,animations:true)
+    }
+    
+    public func pop(animations:Bool=true) {
+        if children.count==0 {return}
+        children.removeLast()
+        node?.pop(skipAnimation:!animations)
+    }
+    
+    public func clear() {
+        while children.count > 0 {pop(animations:false)}
+    }
+    
+    internal func addContent(_ node:ViewNode,animations:Bool) {
+        if let vc=self.node {
+            for c in node.children {
+                var vc1:UIViewController?
+                    
+                if c.value?.isControllerNode == true {
+                    c.value?.build(in:nil,parent:nil,candidate:nil,constrainedTo:vc.view.frame.size,with:[],forceLayout:false)
+                    //print("zstack content is a controller:",primary.children[0].value?.viewController)
+                                                    
+                    //toUpdate.append(c)
+                        
+                    vc1=c.value?.viewController!
+                }
+                else {
+                    vc1=SCLZStackContentController()
+                    vc1!.view.backgroundColor = .clear
+                        
+                    if c.value?.renderedView != nil {
+                        //reuse
+                        //print("zstackviewcreconcile reuse ",c.value!.renderedView!)
+                        c.value!.renderedView!.removeFromSuperview()
+                        vc1!.view.addSubview(c.value!.renderedView!)
+                    }
+                    else {
+                        //print("prev default views:",previousViews)
+                        //print("reconcile ",primary.children[0].value?.renderedView,"parent ",primary.children[0].value?.renderedView?.superview)
+                        c.value?.build(in:vc1!.view,parent:nil,candidate:nil, constrainedTo:vc.view.frame.size,with:[],forceLayout:false)
+                    }
+                
+                    //print("controller build done. controller layout start")
+                
+                    //print("")
+                    //print("view=",view," parent of root=",primary.children[0].value?.renderedView?.superview)
+                
+                    c.value?.renderedView?.frame=CGRect.init(x: 0, y: 0,width: vc.view.frame.width,height: vc.view.frame.size.height)
+                    //print("primary frame:",c.value?.renderedView?.frame)
+                            
+                    c.value?.reconcile(in:vc1!.view,constrainedTo:vc.view.frame.size,with:[])
+                        
+                    //toUpdate.append(c)
+                }
+                    
+                vc.push(viewController:vc1!,animation:.over(),skipAnimation:!animations)
+            } //for
+        }
+    }
+    
+    open func addDefaultContent() {
+        if let vc=node {
+            for c in children {addContent(c,animations:false)}
+        }
+    }
+}
+
 extension _ZStackViewLayout: _VariadicView_UnaryViewRoot {}
 extension _ZStackViewLayout: _VariadicView_ViewRoot {}
 
+public class SCLZStackContentController:UIViewController {
+}
 
-public struct ZStackView<Content>:UIViewControllerRepresentable where Content: View {
+
+public struct ZStackView<DefaultContent>:UIViewControllerRepresentable where DefaultContent: View {
     public typealias UIViewControllerType=SCLNavigationViewController
     public typealias Body = Never
     public typealias UIContainerType = SCLZStackViewContainer
+    private let navigator:ZStackNavigator?
+    let hasContent:Bool
     
-    public var _tree: _VariadicView.Tree<_ZStackViewLayout, Content>
+    public var _tree: _VariadicView.Tree<_ZStackViewLayout, DefaultContent>
     private var _layoutSpec=LayoutSpecWrapper<UIViewType>()
     
-    public init(@ViewBuilder content: () -> Content) {
+    public init(navigator:ZStackNavigator?=nil) where DefaultContent==EmptyView {
+        self.navigator=navigator
         _tree = .init(
-            root: _ZStackViewLayout() , content: content())
+            root: _ZStackViewLayout(), content: EmptyView()
+        )
+        hasContent=false
+    }
+    
+    public init(navigator:ZStackNavigator?=nil,@ViewBuilder def:() -> DefaultContent) {
+        self.navigator=navigator
+        _tree = .init(
+            root: _ZStackViewLayout(), content: def()
+        )
+        hasContent=true
     }
     
     public func makeUIViewController(context:Context) -> UIViewControllerType {
@@ -394,14 +522,18 @@ public struct ZStackView<Content>:UIViewControllerRepresentable where Content: V
         vc.node=_tree.root.zstack!
         let v=UIContainerType()
         vc.view=v
+        navigator?.node=vc
+        navigator?.update(context:context)
         
         return vc
     }
     
     public func updateUIViewController(_ view:UIViewControllerType,context:Context) -> Void {
+        navigator?.node=view
+        navigator?.update(context:context)
     }
     
-    public func withLayoutSpec(_ spec:@escaping (_ spec:LayoutSpec<UIViewType>) -> Void) -> ZStackView<Content> {
+    public func withLayoutSpec(_ spec:@escaping (_ spec:LayoutSpec<UIViewType>) -> Void) -> ZStackView<DefaultContent> {
        _layoutSpec.add(spec)
        return self
     }
@@ -456,30 +588,31 @@ extension ZStackView {
         let vnode = ViewNode(value: node)
         _tree.root.zstack=vnode
         
-        //create a dummy node for primary
-        let primary=ViewNode(value: ConcreteNode(type:UIView.self, layoutSpec:{spec, context in 
-            //fatalError()
-            print("zstackview primary layoutspec")
-            spec.view?.clipsToBounds=true
-            //if minLength>0 {yoga.width=minLength}
-        }))
-        primary.value!.setContext(_tree.root.zstack!.value!.context!) //this will also specify environment
-        vnode.children.append(primary)
-        
-        parent.addChild(node: vnode)
-
-        ViewExtractor.extractViews(contents: _tree.content).forEach { 
-            //print("build list node ",$0)
-            if let n=$0.buildTree(parent: primary, in:primary.runtimeenvironment) 
-            {
-                //elements.append(n)
-                //print("got list view node ",n)
+        if hasContent { //default content present?
+            //create a dummy node for content
+            let content=ViewNode(value: ConcreteNode(type:UIView.self, layoutSpec:{spec, context in 
+                //fatalError()
+                print("zstackview content layoutspec")
+                spec.view?.clipsToBounds=true
+                //if minLength>0 {yoga.width=minLength}
+            }))
+            content.value!.setContext(_tree.root.zstack!.value!.context!) //this will also specify environment
+            vnode.children.append(content)
+            
+            content.value!.setContext(_tree.root.zstack!.value!.context!) //this will also specify environment
+            
+            ViewExtractor.extractViews(contents: _tree.content).forEach { 
+                //print("build list node ",$0)
+                if let n=$0.buildTree(parent: content, in:content.runtimeenvironment) 
+                {
+                    //elements.append(n)
+                    //print("got list view node ",n)
+                }
             }
         }
         
-        //list.canReuseNodes=oldlist==nil || oldlist!.value==nil || list.node.structureMatches(to:oldlist!.value!)
+        parent.addChild(node: vnode)
         
-        //  print("got list with tags ",_tree.root.list!.tags?.tagMapping ?? "nil")
         return vnode
     }
     
@@ -510,52 +643,69 @@ extension ZStackView {
         //print("reconcile zstackview ",view," controller=",context.viewController?.view)
         
         if let vc=context.viewController as? UIViewControllerType {
-            let primary=_tree.root.zstack!.children[0]
+            //vc.rootViewController=parentView?.superview?.findViewController() ?? Application?.rootViewController
+            //print("parent:",parentView)
+            //print("ZStack root:",vc.rootViewController)
             
-            if primary.children.count == 1 && primary.children[0].value?.isControllerNode == true {
-                if primary.children.count==1 {
-                    primary.children[0].value?.build(in:nil,parent:nil,candidate:nil,constrainedTo:vc.view.frame.size,with:[],forceLayout:false)
-                    print("zstack primary is a controller:",primary.children[0].value?.viewController)
+            vc.clear()
+            
+            var toUpdate:[ViewNode]=[]
+            
+            if _tree.root.zstack!.children.count==1 { //we have default content?
+                let primary=_tree.root.zstack!.children[0]
+                
+                if primary.children.count == 1 && primary.children[0].value?.isControllerNode == true {
+                    //do not allow controller for default view
+                    print("Default node of ZStackView has none or multiple children. Cannot build")
+                    /*
+                    if primary.children.count==1 {
+                        primary.children[0].value?.build(in:nil,parent:nil,candidate:nil,constrainedTo:vc.view.frame.size,with:[],forceLayout:false)
+                        print("zstack default is a controller:",primary.children[0].value?.viewController)
                                                     
-                    return [primary.children[0]]
+                        return [primary.children[0]]
+                    }
+                    else {
+                        print("Default node of ZStackView has none or multiple children. Cannot build")
+                        return []
+                    }
+                    */
+                }
+            
+                if primary.children.count==1 {
+                    if primary.children[0].value?.renderedView != nil {
+                        //reuse
+                        //print("zstackviewcreconcile reuse ",primary.children[0].value!.renderedView!)
+                        primary.children[0].value!.renderedView!.removeFromSuperview()
+                        vc.view.addSubview(primary.children[0].value!.renderedView!)
+                    }
+                    else {
+                        //print("prev default views:",previousViews)
+                        //print("reconcile ",primary.children[0].value?.renderedView,"parent ",primary.children[0].value?.renderedView?.superview)
+                        primary.children[0].value?.build(in:vc.view,parent:nil,candidate:nil, constrainedTo:vc.view.frame.size,with:[],forceLayout:false)
+                    }
+                
+                    //print("controller build done. controller layout start")
+                
+                    //print("")
+                    //print("view=",view," parent of root=",primary.children[0].value?.renderedView?.superview)
+                
+                    primary.children[0].value?.renderedView?.frame=CGRect.init(x: 0, y: 0,width: vc.view.frame.width,height: vc.view.frame.size.height)
+                    //print("primary frame:",primary.children[0].value?.renderedView?.frame)
+                            
+                    primary.children[0].value?.reconcile(in:vc.view,constrainedTo:vc.view.frame.size,with:[])
+                    
+                    toUpdate.append(primary.children[0])
                 }
                 else {
-                    print("Primary node of ZStackView has none or multiple children. Cannot build")
+                    print("Default node of ZStackView has none or multiple children. Cannot build")
                     return []
                 }
             }
             
-            if primary.children.count==1 {
-                if primary.children[0].value?.renderedView != nil {
-                    //reuse
-                    //print("zstackviewcreconcile reuse ",primary.children[0].value!.renderedView!)
-                    primary.children[0].value!.renderedView!.removeFromSuperview()
-                    vc.view.addSubview(primary.children[0].value!.renderedView!)
-                }
-                else {
-                    //print("reconcile ",primary.children[0].value?.renderedView,"parent ",primary.children[0].value?.renderedView?.superview)
-                    primary.children[0].value?.build(in:vc.view,parent:nil,candidate:nil, constrainedTo:vc.view.frame.size,with:[],forceLayout:false)
-                }
-                
-                //print("controller build done. controller layout start")
-                
-                //print("")
-                //print("view=",view," parent of root=",primary.children[0].value?.renderedView?.superview)
-                
-                primary.children[0].value?.renderedView?.frame=CGRect.init(x: 0, y: 0,width: vc.view.frame.width,height: vc.view.frame.size.height)
-                //print("primary frame:",primary.children[0].value?.renderedView?.frame)
-                            
-                primary.children[0].value?.reconcile(in:vc.view,constrainedTo:vc.view.frame.size,with:[])
-                
-                //print("controller layout done")
+            navigator?.node=vc
+            navigator?.addDefaultContent()
                                                          
-                return [primary.children[0]]
-            }
-            else {
-                print("Primary node of ZStackView has none or multiple children. Cannot build")
-            }
-            
-            return []
+            return toUpdate
         }
         else {fatalError()}
     }

@@ -147,7 +147,7 @@ func log(_ msg:String, _ spacing:Int=0) {
 //var reconcileCount = -1
 
 public func dumpView(view:UIView,tabs:String="") {
-    print(tabs+"\(type(of:view)) with ",view.subviews.count," children")
+    print(tabs+"\(type(of:view)) with ",view.subviews.count," children (",view.frame,")")
     
     for v in view.subviews {
         dumpView(view:v,tabs:tabs+"    ")
@@ -1273,9 +1273,9 @@ public final class SCLNodeHierarchy<Content>:NodeHierarchy, UIViewRepresentable 
           self.root.reconcile(in:view,constrainedTo:size,with:options)
       }
       
-      //print("SCLNodeHierarchy layout ok")
-      //dumpView(view:self.root.renderedView!)
-      //dumpView(controller:Application!.rootViewController!)
+      /*print("SCLNodeHierarchy layout ok")
+      dumpView(view:self.root.renderedView!)
+      dumpView(controller:Application!.rootViewController!)*/
   }
   
 
