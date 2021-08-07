@@ -1,5 +1,5 @@
 import UIKit
-import Render
+import SwiftUIX
 
 class TMyApplication: SCLApplication {
     var vc: UIViewController?

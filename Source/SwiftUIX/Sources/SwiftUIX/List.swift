@@ -1,7 +1,7 @@
 import Foundation
 import UIKit
 import CoreRender
-import Render
+import SwiftUIX
 
 
 open class SCLTableViewCell: UITableViewCell {
