@@ -245,6 +245,8 @@ extension HStack {
         let node=SCLNode(environment:env, host:self/*,type:UIViewType.self*/,reuseIdentifier:"HStack",key:nil,layoutSpec: { spec, context in
                 guard let yoga = spec.view?.yoga else { return }
                 spec.view!.clipsToBounds=true
+                //print("hstack user interaction:",spec.view!.isUserInteractionEnabled)
+                //spec.view!.isUserInteractionEnabled=false
                 yoga.flexDirection = _tree.root.reversed ? .rowReverse : .row 
                 if _tree.root.alignment == .center {yoga.justifyContent = .center}
                 else if _tree.root.alignment == .bottom {yoga.justifyContent = .flexEnd}
@@ -299,6 +301,7 @@ extension VStack {
                 //print("vstack for layout=\(spec) view ",spec.view)
                 guard let yoga = spec.view?.yoga else { return }
                 spec.view!.clipsToBounds=true
+                //spec.view!.isUserInteractionEnabled=false
                 yoga.flexDirection = _tree.root.reversed ? .columnReverse : .column 
                 if _tree.root.alignment == .center {yoga.justifyContent = .center}
                 else if _tree.root.alignment == .trailing {yoga.justifyContent = .flexEnd}

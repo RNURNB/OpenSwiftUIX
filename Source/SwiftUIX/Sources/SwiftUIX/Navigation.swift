@@ -982,6 +982,9 @@ open class SCLNavigationViewController: UIViewController {
     /// Is animating
     var isAnimating: Bool = false
     
+    ///has a navigation bar
+    public var hasNavigationBar:Bool=false
+    
     // MARK: View lifecycle
     
     open override func viewDidLayoutSubviews() {
@@ -998,7 +1001,7 @@ open class SCLNavigationViewController: UIViewController {
         //print("SCLNavigationViewController view did load")
         
         // Navigation bar
-        if navigationBar==nil {
+        if hasNavigationBar && navigationBar==nil {
             navigationBar = SCLNavigationBar(minHeight: 44)
             navigationBar!.navigationViewController = self
             view.addSubview(navigationBar!)
@@ -1311,8 +1314,10 @@ open class SCLNavigationViewController: UIViewController {
     }
 }
 
-public struct _NavigationViewLayout {
+public class _NavigationViewLayout {
     var navigation:ViewNode?
+    var navBar:SCLUINavigationBar?
+    var navBarContent:ViewNode?
     
     @inlinable public init() {
     }
@@ -1453,17 +1458,126 @@ class NavigationDataSource {
     func append(_ d:DataSourceWrapper) {_dataSource.append(d)}
 }
 
+open class NavigationViewController {
+    internal var _barparent:ViewNode?
+    open var navigationBarSize:CGFloat {get {44}} //return 0 to hide navigation bar
+    open var statusBarSize:CGFloat {get {0}} //return 0 to hide status bar
+    
+    public func rebuild() {
+        var oldView=_barparent!.value!.renderedView!
+        var parentView=_barparent!.value!.renderedView!.superview!
+        let sz=parentView.frame.size
+        oldView.removeFromSuperview()
+        
+        _barparent!.children=[]
+        for c in _barparent!.value!.children {
+            c.setParent(nil)
+        }
+        _barparent!.value!.clearChildren()
+        makeNavigationBarContent(parent:_barparent!)
+        
+        _barparent!.value?.build(in:parentView,parent:nil,candidate:oldView,constrainedTo:sz,with:[],forceLayout:false)
+        
+        _barparent!.value?.renderedView?.frame=CGRect.init(x: 0, y: 0, width: sz.width, height: sz.height)
+                            
+        _barparent!.value?.reconcile(in:parentView,constrainedTo:sz,with:[])
+    }
+    
+    open func makeNavigationBarContent(parent:ViewNode) {}
+}
+
+public class NavigationViewDefaultController:NavigationViewController {
+    var backArrow=SCLBackArrow.regular(.link)
+    var showBackButton:Bool=false
+    
+    var navigationBarContents:some View { get {
+      PassthroughView {
+        HStack {
+            Spacer().width(4)
+            
+            Button(action: {
+                    //alert("hide detail","pressed")
+                    self.showBackButton = !self.showBackButton
+                    self.rebuild()
+
+            }) {
+                Image(systemName: "list.triangle"/*"list.dash.header.rectangle"*/)
+            }
+            .minHeight(22)
+            .minWidth(22)
+            
+            Spacer().width(4)
+            
+            if showBackButton {
+                Button(action: {
+                    alert("back","pressed")
+
+                }) {
+                    HStack {
+                        Image(image: backArrow.image(color:.link)!)
+                        Spacer().width(4).userInteractionEnabled(false)
+                        Text("Back").foregroundColor(.link)
+                    }
+                    .userInteractionEnabled(false)
+                }
+            }
+            
+            Spacer().width(4)
+            
+            PassthroughView {
+                VStack(alignment:.center) {
+                    Text("Main Title").foregroundColor(.link)
+                    Text("Sub Title").foregroundColor(.link)
+                }
+                .alignItems(.center)
+            }
+            .userInteractionEnabled(false)
+            
+            .flexGrow(1)
+            .flex()
+            
+            Spacer().width(4)
+            
+            Button(action: {
+                    alert("edit","pressed")
+
+            }) {
+                Text("Edit").foregroundColor(.link)
+            }
+            
+            Spacer().width(4)
+        }
+        .alignItems(.center)
+      }
+      .height(navigationBarSize)
+      .matchHostingViewWidth(withMargin:0)
+    }}
+    
+    override public var navigationBarSize:CGFloat {get {44}} //return 0 to hide navigation bar
+    override public var statusBarSize:CGFloat {get {30}} //return 0 to hide status bar
+    
+    override public func makeNavigationBarContent(parent:ViewNode) {
+        ViewExtractor.extractViews(contents: self.navigationBarContents).forEach { 
+            _=$0.buildTree(parent: parent, in:parent.runtimeenvironment) 
+        }
+    }
+    
+    override public init() {}
+}
+
 public struct NavigationView<Content>:UIViewControllerRepresentable where Content: View {
     public typealias UIViewControllerType=SCLNavigationViewController
     public typealias Body = Never
     public typealias UIContainerType = SCLNavigationViewContainer
     private let _navigator=SCLNavigationViewNavigator()
     private var _dataSource=NavigationDataSource()
+    public var controller:NavigationViewController
     
     public var _tree: _VariadicView.Tree<_NavigationViewLayout, Content>
     private var _layoutSpec=LayoutSpecWrapper<UIViewType>()
     
-    public init(@ViewBuilder content: () -> Content) {
+    public init(controller:NavigationViewController,@ViewBuilder content: () -> Content) {
+        self.controller=controller
         _tree = .init(
             root: _NavigationViewLayout() , content: content())
     }
@@ -1538,6 +1652,17 @@ extension NavigationView {
         
         parent.addChild(node: vnode)
         
+        if controller.navigationBarSize>0 {
+            _tree.root.navBar=SCLUINavigationBar(controller:controller)
+            let content=ViewNode(value: ConcreteNode(type:UIView.self, layoutSpec:{spec, context in 
+                //fatalError()
+                print("zstackview content layoutspec")
+                spec.view?.clipsToBounds=true
+                //if minLength>0 {yoga.width=minLength}
+            }))
+            _tree.root.navBarContent=_tree.root.navBar!.buildTree(parent:content,in:env)
+        }
+        
         //create a dummy node for content
         let content=ViewNode(value: ConcreteNode(type:UIView.self, layoutSpec:{spec, context in 
             //fatalError()
@@ -1576,6 +1701,58 @@ extension NavigationView {
             self.navigationView=navigationView
         }
     }
+}
+
+class SCLNavigationBarHolder:UIView {
+}
+
+struct SCLUINavigationBar: UIViewRepresentable {
+    internal var _layoutSpec=LayoutSpecWrapper<UIViewType>()
+    var controller:NavigationViewController
+    
+    public init(controller:NavigationViewController) {self.controller=controller}
+    
+    public typealias Body = Never
+    public typealias UIViewType = SCLNavigationBarHolder
+    //public var context:SCLContext? = nil
+    public var body: Never {
+        fatalError()
+    }
+    
+    public func withLayoutSpec(_ spec:@escaping (_ spec:LayoutSpec<UIViewType>) -> Void) -> SCLUINavigationBar {_layoutSpec.add(spec);return self}
+}
+
+extension SCLUINavigationBar {
+    
+    public func makeUIView(context:UIViewRepresentableContext<SCLUINavigationBar>) -> UIViewType {
+        return UIViewType(frame:CGRect(x:0,y:0,width:0,height:0))
+    }
+    
+    public func updateUIView(_ view:UIViewType,context:UIViewRepresentableContext<SCLUINavigationBar>) -> Void {
+    }
+    
+    public func buildTree(parent: ViewNode, in env:SCLEnvironment) -> ViewNode? {
+        //self.context=context
+        
+        let node=SCLNode(environment:env, host:self/*,type:UIView.self*/, reuseIdentifier:"SCLUINavigationBar",key:nil,layoutSpec: { spec, context in
+                guard let yoga = spec.view?.yoga else { return }
+                spec.view!.clipsToBounds=true
+                self._layoutSpec.layoutSpec?(spec)
+            }
+            ,controller:defaultController
+        )
+        
+        let vnode = ViewNode(value: node)
+        parent.addChild(node: vnode)
+        
+        controller._barparent=vnode
+        controller.makeNavigationBarContent(parent:vnode)
+        
+        return vnode
+    }
+}
+
+class SCLNavigationStatusBarHolder:UIView {
 }
 
 class SCLNavigationDetailHolder:UIView {
@@ -1660,43 +1837,54 @@ extension NavigationView {
                   
         //print("vc view:")
         //dumpView(view:vc.view)
-        
-        vc.navigationBar = SCLNavigationBar(minHeight: nil/*44*/)
-        vc.navigationBar!.navigationViewController = vc
-        _dataSource.detailController!.view.addSubview(vc.navigationBar!)
     
-        vc.navigationBar!.translatesAutoresizingMaskIntoConstraints=false
-        vc.navigationBar!.leftAnchor.constraint(equalTo: _dataSource.detailController!.view.leftAnchor,constant:0).isActive = true
-        vc.navigationBar!.topAnchor.constraint(equalTo: _dataSource.detailController!.view.topAnchor,constant:0).isActive = true
-        vc.navigationBar!.rightAnchor.constraint(equalTo: _dataSource.detailController!.view.rightAnchor,constant:0).isActive = true
-        vc.navigationBar!.bottomAnchor.constraint(equalTo: _dataSource.detailController!.view.topAnchor,constant:100+44).isActive = true
+        var navbar:SCLNavigationBarHolder?=nil
+        if controller.navigationBarSize>0 {
+            navbar=SCLNavigationBarHolder()
+            navbar!.backgroundColor = .systemGray4
+            _dataSource.detailController!.view.addSubview(navbar!)
     
-        //vc.navigationBar!.hasShadow=true
-        vc.navigationBar!.titleView?.titleLabel.text="Title"
-        vc.navigationBar!.titleView?.subtitleLabel.text="Subtitle"
-        vc.navigationBar!.titleView?.promptLabel.text="Prompt"
-        vc.navigationBar!.layoutIfNeeded()
-        print("navbar:")
-        dumpView(view:vc.navigationBar!)
+            navbar!.translatesAutoresizingMaskIntoConstraints=false
+            navbar!.leftAnchor.constraint(equalTo: _dataSource.detailController!.view.leftAnchor,constant:0).isActive = true
+            navbar!.topAnchor.constraint(equalTo: _dataSource.detailController!.view.topAnchor,constant:0).isActive = true
+            navbar!.rightAnchor.constraint(equalTo: _dataSource.detailController!.view.rightAnchor,constant:0).isActive = true
+            navbar!.bottomAnchor.constraint(equalTo: _dataSource.detailController!.view.topAnchor,constant:controller.navigationBarSize).isActive = true
+            
+            var sz=_dataSource.detailController!.view.frame.size
+            sz.height=controller.navigationBarSize
+            
+            if _tree.root.navBarContent!.value?.renderedView != nil {
+                //reuse
+                    
+                _tree.root.navBarContent!.value!.renderedView!.removeFromSuperview()
+                navbar!.addSubview(_tree.root.navBarContent!.value!.renderedView!)
+            }
+            else {
+                _tree.root.navBarContent!.value?.build(in:navbar!,parent:nil,candidate:nil,constrainedTo:sz,with:[],forceLayout:false)
+            }
+            
+            _tree.root.navBarContent!.value?.renderedView?.frame=CGRect.init(x: 0, y: 0, width: sz.width, height: sz.height)
+                            
+            _tree.root.navBarContent!.value?.reconcile(in:navbar!,constrainedTo:sz,with:[])
+        }
         
-        var sz=vc.view.frame.size
-        sz.height=sz.height-(vc.navigationBar?.frame.size.height ?? 0)
+        var sz=_dataSource.detailController!.view.frame.size
+        sz.height=sz.height-controller.navigationBarSize-controller.statusBarSize
         
         let v=SCLNavigationDetailHolder()
         //v.backgroundColor = .green
         _dataSource.detailController!.view.addSubview(v)
         v.translatesAutoresizingMaskIntoConstraints=false
         v.leftAnchor.constraint(equalTo: _dataSource.detailController!.view.leftAnchor,constant:0).isActive = true
-        v.topAnchor.constraint(equalTo: vc.navigationBar?.bottomAnchor ?? _dataSource.detailController!.view.topAnchor,constant:0).isActive = true
+        v.topAnchor.constraint(equalTo: navbar?.bottomAnchor ?? _dataSource.detailController!.view.topAnchor,constant:0).isActive = true
         v.rightAnchor.constraint(equalTo: _dataSource.detailController!.view.rightAnchor,constant:0).isActive = true
-        v.bottomAnchor.constraint(equalTo: _dataSource.detailController!.view.bottomAnchor,constant:0).isActive = true
+        v.bottomAnchor.constraint(equalTo: _dataSource.detailController!.view.bottomAnchor,constant:-controller.statusBarSize).isActive = true
         
         _dataSource.detailController!.view.layoutIfNeeded()
         
-        sz.width=200
-        sz.height=200
+        //print("detail dump:")
+        //dumpView(view:_dataSource.detailController!.view)
         
-                  
         if let secondary=node {
             if secondary.children.count == 1 && secondary.children[0].value?.isControllerNode == true {
                 secondary.children[0].value?.build(in:v,parent:nil,candidate:secondary.children[0].value!.viewController!.view,
@@ -1734,7 +1922,7 @@ extension NavigationView {
                                             prev=prev.subviews[0]
                                             if prev is SCLSplitContentView {
                                                 secondary.children[0].value?.origCandidate=prev.subviews[0]
-                                                if secondary.children[0].value?.origCandidate is SCLNavigationBar { 
+                                                if secondary.children[0].value?.origCandidate is SCLNavigationBarHolder { //has a navbar
                                                     secondary.children[0].value?.origCandidate=prev.subviews[1]
                                                 }
                                                 if secondary.children[0].value?.origCandidate is SCLNavigationDetailHolder {
@@ -1772,6 +1960,18 @@ extension NavigationView {
                 }
             }
         }          
+        
+        if controller.statusBarSize>0 {
+            let statusbar=SCLNavigationStatusBarHolder()
+            statusbar.backgroundColor = .systemGray5
+            _dataSource.detailController!.view.addSubview(statusbar)
+    
+            statusbar.translatesAutoresizingMaskIntoConstraints=false
+            statusbar.leftAnchor.constraint(equalTo: _dataSource.detailController!.view.leftAnchor,constant:0).isActive = true
+            statusbar.topAnchor.constraint(equalTo: _dataSource.detailController!.view.bottomAnchor,constant:-controller.statusBarSize).isActive = true
+            statusbar.rightAnchor.constraint(equalTo: _dataSource.detailController!.view.rightAnchor,constant:0).isActive = true
+            statusbar.bottomAnchor.constraint(equalTo: _dataSource.detailController!.view.bottomAnchor,constant:0).isActive = true
+        }
         
         //print("addLayer End")
         //dumpView(view:_dataSource.detailController!.view)

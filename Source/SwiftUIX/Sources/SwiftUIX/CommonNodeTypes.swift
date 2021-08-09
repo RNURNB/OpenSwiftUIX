@@ -4,20 +4,22 @@ import CoreRender
 
 public class SCLButton: UIButton {
   func setChildrenStatus(_ touchInside:Bool) {
+      //print("setChikdrenTouchInside:",touchInside)
       for v in subviews {
             if !v.isHidden && !v.isUserInteractionEnabled /*&& v.point(inside: self.convert(point, to: v), with: event)*/ {
                 v.alpha = touchInside ? 0.4 : 1.0
                 //alert("button","point \(ok)")
-                break
+                //break
             }
       }
   }  
     
-  /*public override func point(inside point: CGPoint, with event: UIEvent?) -> Bool {
+  public override func point(inside point: CGPoint, with event: UIEvent?) -> Bool {
     var ok=super.point(inside:point,with:event)
-    setChildrenStatus(ok)
+    //var ok=point.x>=0 && point.y>=0 && point.x<frame.size.width && point.y<frame.size.height
+    //setChildrenStatus(ok)
     return ok
-  }*/
+  }
   
   public override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
     super.touchesBegan(touches,with:event)
@@ -27,7 +29,7 @@ public class SCLButton: UIButton {
   
   public override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?) {
     super.touchesMoved(touches,with:event)
-    //print("finger touched the screen...")
+    //print("finger moved the screen...")
     if let touch = touches.first as? UITouch {
         let point = touch.location(in:self)
         setChildrenStatus((self.bounds.contains(point)))
@@ -36,7 +38,14 @@ public class SCLButton: UIButton {
   
   public override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
     super.touchesEnded(touches,with:event)
-    //print("finger touched the screen...")
+    //print("finger ended touching the screen...")
+    //alert("button","touch end")
+    setChildrenStatus(false)
+  }
+  
+  public override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) {
+    super.touchesCancelled(touches,with:event)
+    //print("finger cancelled touching the screen...")
     //alert("button","touch end")
     setChildrenStatus(false)
   }

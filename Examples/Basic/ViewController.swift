@@ -12,17 +12,17 @@ class GlobalState:ObservableObject {
 } 
   
 struct Item:Hashable, Identifiable {  
-    var name:String 
-    let id=UUID()   
-               
+    var name:String  
+    let id=UUID()    
+                
     init(_ name:String) {          
         self.name=name   
     }        
-}    
-      
+}     
+       
 struct ListSection:Hashable, Identifiable { 
-    var name:String 
-    let id=UUID()
+    var name:String  
+    let id=UUID() 
     var items:[Item]=[Item("item 1")] 
      
     init(_ name:String) { 
@@ -125,6 +125,7 @@ class TMainForm: SCLFormController {
    
   public final class Demo1View:View {
     public var context:SCLContext?=nil
+    var navigationController=NavigationViewDefaultController()
     //public func withLayoutSpec(_ spec:@escaping (_ spec:LayoutSpec<UIView/*Self.UIBody*/>) -> Void) -> Self {return self}  
     var zstackcount=0
       
@@ -312,7 +313,7 @@ class TMainForm: SCLFormController {
             .font(Font.system(size: 10, weight: .regular, design: .monospaced))
             
             
-            NavigationView {
+            NavigationView(controller:navigationController) {
                 List(selection:$listSelection) {
                     ForEach(demo.sections/*, id: \.self*/) { section in
                         //Text(section.name)

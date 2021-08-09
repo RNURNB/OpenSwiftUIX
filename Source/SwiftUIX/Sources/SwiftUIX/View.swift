@@ -765,10 +765,17 @@ public struct Image: UIViewRepresentable {
     public typealias UIViewType = UIImageView
     //public var context:SCLContext? = nil
     private let systemName:String?
+    private let image:UIImage?
     private var _layoutSpec=LayoutSpecWrapper<UIViewType>()
     
     public init(systemName:String) {
         self.systemName=systemName
+        self.image=nil
+    }
+    
+    public init(image:UIImage) {
+        self.image=image
+        self.systemName=nil
     }
     
     public var body: Never {
@@ -793,6 +800,7 @@ extension Image {
         let node=SCLNode(environment:env, host:self/*,type:UIViewType.self*/,reuseIdentifier:nil,key:nil,layoutSpec: { spec, context in
                 if let image=spec.view as? UIViewType {
                     if self.systemName != nil {image.image=UIImage(systemName:self.systemName!)}
+                    if self.image != nil {image.image=self.image!}
                     image.isUserInteractionEnabled=false
                     spec.view!.clipsToBounds=true
                     //if minLength>0 {yoga.width=minLength}
