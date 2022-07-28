@@ -1,2 +1,0 @@
-#include "./../CoreRender/IosCoreRender.h"
-
