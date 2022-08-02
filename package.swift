@@ -2,11 +2,12 @@ import PackageDescription
 
 
 let platformTargets: [Target] = [
-    .target(name: "symswi"),
+    .target(name: "symswi")
     
 ]
+
 let platformProducts: [Product] =  [
-  .library(name: "symswi", targets: ["symswi"]),
+  .library(name: "symswi", targets: ["symswi"])
 ]
 
 
