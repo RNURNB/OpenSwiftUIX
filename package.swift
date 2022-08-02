@@ -1,19 +1,20 @@
+// swift-tools-version:5.0
+//
+//  Package.swift
+//  BigInt
+//
+//  Created by Károly Lőrentey on 2016-01-12.
+//  Copyright © 2016-2017 Károly Lőrentey.
+//
+
 import PackageDescription
-
-
-let platformTargets: [Target] = [
-    .target(name: "symswi")
-    
-]
-
-let platformProducts: [Product] =  [
-  .library(name: "symswi", targets: ["symswi"])
-]
-
 
 let package = Package(
     name: "symswi",
-    products: platformProducts,
-    targets: platformTargets,
-    cxxLanguageStandard: .cxx11
+    products: [
+        .library(name: "symswi", targets: ["symswi"])
+    ],
+    targets: [
+        .target(name: "symswi", path: "Sources")
+    ]
 )
