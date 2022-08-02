@@ -11,7 +11,7 @@ import PackageDescription
 
 let package = Package(
     name: "symswi",
-    products: [
+    products: [ 
         .library(name: "symswi", targets: ["symswi"])
     ],
     targets: [
