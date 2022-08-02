@@ -1,7 +1,7 @@
 // swift-tools-version:5.0
 //
 //  Package.swift
-//  BigInt
+//  symswi
 //
 //  Created by Károly Lőrentey on 2016-01-12.
 //  Copyright © 2016-2017 Károly Lőrentey.
